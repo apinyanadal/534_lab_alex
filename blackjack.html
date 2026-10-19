@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Blackjack Odds Trainer</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: #0d3b26; color: #f2f2f2; min-height: 100vh;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 20px 16px 40px; }
+  h1 { margin: 0 0 4px; font-size: 26px; }
+  .sub { margin: 0 0 18px; color: #b9d4c4; font-size: 14px; }
+  .top { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+  .stat { background: #0a2e1d; border: 1px solid #1f5c3f; border-radius: 8px; padding: 8px 14px; }
+  .stat b { display: block; font-size: 20px; }
+  .stat span { font-size: 12px; color: #9fc2ae; text-transform: uppercase; letter-spacing: .5px; }
+  .table { background: #146b43; border: 2px solid #1f8a57; border-radius: 14px; padding: 16px; }
+  .zone h2 { font-size: 15px; margin: 0 0 8px; color: #d8eee2; font-weight: 600; }
+  .cards { display: flex; gap: 8px; min-height: 96px; flex-wrap: wrap; }
+  .card {
+    width: 64px; height: 92px; background: #fff; color: #111; border-radius: 7px;
+    display: flex; flex-direction: column; justify-content: space-between; padding: 5px 7px;
+    font-weight: 700; box-shadow: 0 2px 5px rgba(0,0,0,.35); font-size: 18px;
+  }
+  .card .mid { text-align: center; font-size: 26px; }
+  .card .bot { text-align: right; transform: rotate(180deg); }
+  .card.red { color: #c0262d; }
+  .card.back { background: repeating-linear-gradient(45deg, #8a1c24, #8a1c24 6px, #a8323b 6px, #a8323b 12px); border: 3px solid #fff; }
+  .zone { margin-bottom: 14px; }
+  .msg { min-height: 28px; font-size: 18px; font-weight: 600; margin: 6px 0 12px; }
+  .msg.win { color: #ffe066; } .msg.lose { color: #ffb3b3; } .msg.push { color: #cfe3ff; }
+  .btns { display: flex; gap: 8px; flex-wrap: wrap; }
+  button {
+    font-size: 16px; font-weight: 600; padding: 10px 18px; border-radius: 8px; border: none;
+    background: #f2f2f2; color: #0d3b26; cursor: pointer; border: 3px solid transparent;
+  }
+  button:disabled { opacity: .35; cursor: not-allowed; }
+  button.deal { background: #ffd43b; }
+  button.rec { border-color: #ffd43b; box-shadow: 0 0 0 2px #0d3b26 inset; }
+  .panel { margin-top: 16px; background: #0a2e1d; border: 1px solid #1f5c3f; border-radius: 12px; padding: 14px 16px; }
+  .panel h2 { margin: 0 0 10px; font-size: 16px; }
+  .advice { font-size: 22px; font-weight: 700; color: #ffd43b; margin-bottom: 10px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+  .cell { background: #0d3b26; border-radius: 8px; padding: 8px 10px; }
+  .cell span { font-size: 12px; color: #9fc2ae; display: block; }
+  .cell b { font-size: 18px; }
+  .bar { display: flex; height: 14px; border-radius: 7px; overflow: hidden; margin: 10px 0 4px; }
+  .bar div { height: 100%; }
+  .legend { font-size: 12px; color: #b9d4c4; }
+  .muted { color: #9fc2ae; font-size: 13px; }
+  .notes { margin-top: 16px; font-size: 12px; color: #9fc2ae; line-height: 1.5; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Blackjack Odds Trainer</h1>
+  <p class="sub">Play $100 hands against the house. The panel below shows your odds and the mathematically best move for every decision.</p>
+
+  <div class="top">
+    <div class="stat"><span>Bankroll</span><b id="bank">$1,000</b></div>
+    <div class="stat"><span>Bet</span><b id="bet">$100</b></div>
+    <div class="stat"><span>Hands</span><b id="hands">0</b></div>
+    <div class="stat"><span>W / L / P</span><b id="wlp">0 / 0 / 0</b></div>
+    <div class="stat"><span>Followed advice</span><b id="follow">-</b></div>
+  </div>
+
+  <div class="table">
+    <div class="zone">
+      <h2>Dealer <span id="dTotal" class="muted"></span></h2>
+      <div class="cards" id="dealer"></div>
+    </div>
+    <div class="zone">
+      <h2>You <span id="pTotal" class="muted"></span></h2>
+      <div class="cards" id="player"></div>
+    </div>
+    <div class="msg" id="msg">Press Deal to start.</div>
+    <div class="btns">
+      <button class="deal" id="bDeal">Deal ($100)</button>
+      <button id="bHit" disabled>Hit</button>
+      <button id="bStand" disabled>Stand</button>
+      <button id="bDouble" disabled>Double</button>
+      <button id="bReset">Reset to $1,000</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Odds &amp; advice</h2>
+    <div id="odds" class="muted">Deal a hand to see the odds.</div>
+  </div>
+
+  <p class="notes">
+    Rules: 6-deck shoe, dealer stands on soft 17, dealer checks for blackjack, blackjack pays 3:2, double on first two cards only, no splitting or surrender.
+    Odds are computed exactly with an infinite-deck model (each rank drawn with fixed probability), which is the standard approximation for a multi-deck shoe.
+    Expected value (EV) is per $100 bet: +10% means you win $10 per hand on average.
+  </p>
+</div>
+
+<script>
+// MATH START
+// Card values 1..10 (1 = Ace, 10 = any ten-value card). Infinite-deck probabilities.
+const P = c => (c === 10 ? 4 / 13 : 1 / 13);
+const best = (sum, ace) => (ace && sum + 10 <= 21 ? sum + 10 : sum);
+
+// Dealer final distribution from a state: [17,18,19,20,21,bust]
+const memoD = {};
+function dealerRec(sum, ace) {
+  const key = sum + "_" + ace;
+  if (memoD[key]) return memoD[key];
+  const b = best(sum, ace);
+  const out = [0, 0, 0, 0, 0, 0];
+  if (b > 21) out[5] = 1;
+  else if (b >= 17) out[b - 17] = 1;
+  else {
+    for (let c = 1; c <= 10; c++) {
+      const r = dealerRec(sum + c, ace || c === 1);
+      for (let i = 0; i < 6; i++) out[i] += P(c) * r[i];
+    }
+  }
+  memoD[key] = out;
+  return out;
+}
+
+// Dealer distribution given upcard, conditioned on dealer NOT having blackjack (dealer already peeked)
+const memoUp = {};
+function dealerDist(up) {
+  if (memoUp[up]) return memoUp[up];
+  const out = [0, 0, 0, 0, 0, 0];
+  let norm = 0;
+  for (let c = 1; c <= 10; c++) {
+    if ((up === 1 && c === 10) || (up === 10 && c === 1)) continue;
+    norm += P(c);
+  }
+  for (let c = 1; c <= 10; c++) {
+    if ((up === 1 && c === 10) || (up === 10 && c === 1)) continue;
+    const r = dealerRec(up + c, up === 1 || c === 1);
+    for (let i = 0; i < 6; i++) out[i] += (P(c) / norm) * r[i];
+  }
+  memoUp[up] = out;
+  return out;
+}
+
+// Win / push / lose probabilities if player stands on total pb
+function standOutcome(pb, up) {
+  if (pb > 21) return { win: 0, push: 0, lose: 1 };
+  const d = dealerDist(up);
+  let win = d[5], push = 0, lose = 0;
+  for (let i = 0; i < 5; i++) {
+    const dt = 17 + i;
+    if (pb > dt) win += d[i];
+    else if (pb === dt) push += d[i];
+    else lose += d[i];
+  }
+  return { win, push, lose };
+}
+const evStand = (pb, up) => { const o = standOutcome(pb, up); return o.win - o.lose; };
+
+// EV of hitting, then playing optimally (hit or stand) afterwards
+const memoH = {};
+function evHit(sum, ace, up) {
+  const key = sum + "_" + ace + "_" + up;
+  if (key in memoH) return memoH[key];
+  let ev = 0;
+  for (let c = 1; c <= 10; c++) {
+    const ns = sum + c, na = ace || c === 1, nb = best(ns, na);
+    if (nb > 21) ev += P(c) * -1;
+    else ev += P(c) * Math.max(evStand(nb, up), evHit(ns, na, up));
+  }
+  memoH[key] = ev;
+  return ev;
+}
+
+// EV of doubling: exactly one card, bet doubled (expressed per original bet)
+function evDouble(sum, ace, up) {
+  let ev = 0;
+  for (let c = 1; c <= 10; c++) {
+    const ns = sum + c, na = ace || c === 1, nb = best(ns, na);
+    ev += P(c) * (nb > 21 ? -1 : evStand(nb, up));
+  }
+  return 2 * ev;
+}
+
+// Probability the next card busts you
+function bustChance(sum, ace) {
+  let p = 0;
+  for (let c = 1; c <= 10; c++) if (best(sum + c, ace || c === 1) > 21) p += P(c);
+  return p;
+}
+// MATH END
+
+// ---------- Game ----------
+const BET = 100, START = 1000;
+const suits = ["♠", "♥", "♦", "♣"];
+const ranks = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+let shoe = [], player = [], dealer = [], bank = START, inHand = false, hideHole = true;
+let stats = { hands: 0, w: 0, l: 0, p: 0, dec: 0, follow: 0 };
+let currentRec = null, canDouble = false;
+
+const $ = id => document.getElementById(id);
+const val = r => (r === "A" ? 1 : ["J", "Q", "K", "10"].includes(r) ? 10 : +r);
+
+function newShoe() {
+  shoe = [];
+  for (let d = 0; d < 6; d++) for (const s of suits) for (const r of ranks) shoe.push({ r, s });
+  for (let i = shoe.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shoe[i], shoe[j]] = [shoe[j], shoe[i]];
+  }
+}
+function draw() { if (shoe.length < 52) newShoe(); return shoe.pop(); }
+
+function handInfo(cards) {
+  let sum = 0, ace = false;
+  for (const c of cards) { sum += val(c.r); if (c.r === "A") ace = true; }
+  const b = best(sum, ace);
+  return { sum, ace, best: b, soft: ace && sum + 10 <= 21 };
+}
+const isBJ = cards => cards.length === 2 && handInfo(cards).best === 21;
+const money = n => (n < 0 ? "-$" : "$") + Math.abs(n).toLocaleString();
+const pct = x => (x * 100).toFixed(1) + "%";
+
+function cardHTML(c, hidden) {
+  if (hidden) return '<div class="card back"></div>';
+  const red = c.s === "♥" || c.s === "♦";
+  return `<div class="card ${red ? "red" : ""}"><div>${c.r}${c.s}</div><div class="mid">${c.s}</div><div class="bot">${c.r}${c.s}</div></div>`;
+}
+
+function render() {
+  $("player").innerHTML = player.map(c => cardHTML(c)).join("");
+  $("dealer").innerHTML = dealer.map((c, i) => cardHTML(c, i === 1 && hideHole)).join("");
+  const p = handInfo(player);
+  $("pTotal").textContent = player.length ? `(${p.soft ? "soft " : ""}${p.best})` : "";
+  if (dealer.length) {
+    $("dTotal").textContent = hideHole ? `(showing ${val(dealer[0].r) === 1 ? "A" : val(dealer[0].r)})` : `(${handInfo(dealer).best})`;
+  } else $("dTotal").textContent = "";
+  $("bank").textContent = money(bank);
+  $("hands").textContent = stats.hands;
+  $("wlp").textContent = `${stats.w} / ${stats.l} / ${stats.p}`;
+  $("follow").textContent = stats.dec ? `${stats.follow}/${stats.dec} (${Math.round(100 * stats.follow / stats.dec)}%)` : "-";
+
+  $("bDeal").disabled = inHand || bank < BET;
+  $("bHit").disabled = !inHand;
+  $("bStand").disabled = !inHand;
+  $("bDouble").disabled = !inHand || !canDouble;
+  for (const b of ["bHit", "bStand", "bDouble"]) $(b).classList.remove("rec");
+  if (inHand && currentRec) $({ Hit: "bHit", Stand: "bStand", Double: "bDouble" }[currentRec]).classList.add("rec");
+}
+
+function setMsg(text, cls) { const m = $("msg"); m.textContent = text; m.className = "msg " + (cls || ""); }
+
+function updateOdds() {
+  if (!inHand) return;
+  const p = handInfo(player), up = val(dealer[0].r);
+  const so = standOutcome(p.best, up);
+  const eS = evStand(p.best, up), eH = evHit(p.sum, p.ace, up);
+  const eD = canDouble ? evDouble(p.sum, p.ace, up) : null;
+  const options = [["Stand", eS], ["Hit", eH]];
+  if (eD !== null) options.push(["Double", eD]);
+  options.sort((a, b) => b[1] - a[1]);
+  currentRec = options[0][0];
+  const dd = dealerDist(up);
+
+  $("odds").innerHTML = `
+    <div class="advice">Best move: ${currentRec}</div>
+    <div class="grid">
+      <div class="cell"><span>EV if you stand</span><b>${pct(eS)}</b></div>
+      <div class="cell"><span>EV if you hit</span><b>${pct(eH)}</b></div>
+      <div class="cell"><span>EV if you double</span><b>${eD === null ? "n/a" : pct(eD)}</b></div>
+      <div class="cell"><span>Bust chance on next card</span><b>${pct(bustChance(p.sum, p.ace))}</b></div>
+      <div class="cell"><span>Dealer bust chance</span><b>${pct(dd[5])}</b></div>
+    </div>
+    <div class="bar">
+      <div style="width:${so.win * 100}%;background:#51cf66"></div>
+      <div style="width:${so.push * 100}%;background:#adb5bd"></div>
+      <div style="width:${so.lose * 100}%;background:#ff6b6b"></div>
+    </div>
+    <div class="legend">If you stand on ${p.best}: win ${pct(so.win)} · push ${pct(so.push)} · lose ${pct(so.lose)}</div>`;
+}
+
+function track(action) { stats.dec++; if (action === currentRec) stats.follow++; }
+
+function settle(result, amount) {
+  inHand = false; hideHole = false; currentRec = null;
+  bank += amount; stats.hands++;
+  if (result === "win") stats.w++; else if (result === "lose") stats.l++; else stats.p++;
+  const sign = amount > 0 ? `+${money(amount)}` : amount < 0 ? money(amount) : "$0";
+  return sign;
+}
+
+function deal() {
+  if (bank < BET) return;
+  player = [draw(), draw()];
+  dealer = [draw(), draw()];
+  inHand = true; hideHole = true; canDouble = bank >= 2 * BET;
+  const pBJ = isBJ(player), dBJ = isBJ(dealer);
+  if (pBJ || dBJ) {
+    let txt;
+    if (pBJ && dBJ) txt = `Both have blackjack. Push. ${settle("push", 0)}`;
+    else if (pBJ) txt = `Blackjack! Pays 3:2. ${settle("win", 1.5 * BET)}`;
+    else txt = `Dealer has blackjack. ${settle("lose", -BET)}`;
+    setMsg(txt, pBJ && !dBJ ? "win" : dBJ && !pBJ ? "lose" : "push");
+    $("odds").innerHTML = '<span class="muted">Hand decided on the deal, no decision to make.</span>';
+  } else {
+    setMsg("Your move.");
+    updateOdds();
+  }
+  checkBroke();
+  render();
+}
+
+function hit() {
+  track("Hit");
+  player.push(draw());
+  canDouble = false;
+  const p = handInfo(player);
+  if (p.best > 21) {
+    setMsg(`Bust with ${p.best}. ${settle("lose", -BET)}`, "lose");
+    $("odds").innerHTML = '<span class="muted">Hand over.</span>';
+    checkBroke();
+  } else if (p.best === 21) {
+    finish(BET);
+    return;
+  } else updateOdds();
+  render();
+}
+
+function stand() { track("Stand"); finish(BET); }
+
+function doubleDown() {
+  track("Double");
+  player.push(draw());
+  const p = handInfo(player);
+  if (p.best > 21) {
+    setMsg(`Doubled and bust with ${p.best}. ${settle("lose", -2 * BET)}`, "lose");
+    $("odds").innerHTML = '<span class="muted">Hand over.</span>';
+    checkBroke(); render(); return;
+  }
+  finish(2 * BET);
+}
+
+function finish(stake) {
+  hideHole = false;
+  while (handInfo(dealer).best < 17) dealer.push(draw());
+  const p = handInfo(player).best, d = handInfo(dealer).best;
+  let txt, cls;
+  if (d > 21) { txt = `Dealer busts with ${d}. You win. ${settle("win", stake)}`; cls = "win"; }
+  else if (p > d) { txt = `${p} beats ${d}. You win. ${settle("win", stake)}`; cls = "win"; }
+  else if (p < d) { txt = `${d} beats ${p}. You lose. ${settle("lose", -stake)}`; cls = "lose"; }
+  else { txt = `Push at ${p}. ${settle("push", 0)}`; cls = "push"; }
+  setMsg(txt, cls);
+  $("odds").innerHTML = '<span class="muted">Hand over. Press Deal for the next one.</span>';
+  checkBroke();
+  render();
+}
+
+function checkBroke() {
+  if (!inHand && bank < BET) setMsg(`Out of money (${money(bank)}). Press Reset to start again.`, "lose");
+}
+
+function reset() {
+  bank = START; player = []; dealer = []; inHand = false; currentRec = null;
+  stats = { hands: 0, w: 0, l: 0, p: 0, dec: 0, follow: 0 };
+  newShoe();
+  setMsg("Press Deal to start.");
+  $("odds").innerHTML = "Deal a hand to see the odds.";
+  render();
+}
+
+$("bDeal").onclick = deal;
+$("bHit").onclick = hit;
+$("bStand").onclick = stand;
+$("bDouble").onclick = doubleDown;
+$("bReset").onclick = reset;
+newShoe();
+render();
+</script>
+</body>
+</html>
